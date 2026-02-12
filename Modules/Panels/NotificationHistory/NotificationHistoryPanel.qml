@@ -307,6 +307,12 @@ SmartPanel {
       return true;
     }
 
+    function clearAllNotifications() {
+      NotificationService.clearHistory();
+      root.close();
+      return true;
+    }
+
     function selectNextRange() {
       if (!groupByDate || !tabsBox.visible)
         return false;
@@ -509,6 +515,12 @@ SmartPanel {
                           event.accepted = true;
                           return;
                         }
+                      }
+                      if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)
+                          && (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)) {
+                        if (panelContent.clearAllNotifications())
+                          event.accepted = true;
+                        return;
                       }
                       if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
                         if (panelContent.dismissSelectedNotification())
