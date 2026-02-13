@@ -462,9 +462,42 @@ SmartPanel {
       if (!delegateItem || delegateItem.isRemoving)
         return false;
 
-      clearActionSelection();
+      selectNeighborAfterRemoval(delegateItem.notificationId);
       delegateItem.swipeOffset = 1;
       delegateItem.dismissBySwipe();
+      return true;
+    }
+
+    function selectNeighborAfterRemoval(notificationId) {
+      var delegates = visibleDelegates();
+      if (delegates.length === 0) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+        return false;
+      }
+
+      var removedIndex = -1;
+      for (var i = 0; i < delegates.length; ++i) {
+        if (delegates[i].notificationId === notificationId) {
+          removedIndex = i;
+          break;
+        }
+      }
+
+      if (removedIndex < 0)
+        return false;
+
+      // Prefer the notification above the removed one; if unavailable, use the next below.
+      var fallbackIndex = removedIndex > 0 ? removedIndex - 1 : (delegates.length > 1 ? 1 : -1);
+      if (fallbackIndex < 0 || fallbackIndex >= delegates.length) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+        return false;
+      }
+
+      keyboardSelectedId = delegates[fallbackIndex].notificationId;
+      clearActionSelection();
+      ensureDelegateVisible(delegates[fallbackIndex]);
       return true;
     }
 
@@ -1180,6 +1213,7 @@ SmartPanel {
                           anchors.verticalCenter: parent.verticalCenter
 
                           onClicked: {
+                            panelContent.selectNeighborAfterRemoval(notificationId);
                             NotificationService.removeFromHistory(notificationId);
                           }
                         }
