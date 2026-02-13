@@ -86,6 +86,7 @@ SmartPanel {
     // 0 = All, 1 = Today, 2 = Yesterday, 3 = Earlier
     property int currentRange: 1  // start on Today by default
     property bool groupByDate: true
+    property bool showKeybindHelp: false
     property string keyboardSelectedId: ""
     property string keyboardActionNotificationId: ""
     property int keyboardActionIndex: -1
@@ -421,6 +422,14 @@ SmartPanel {
     }
 
     Keys.onPressed: event => {
+                      if (panelContent.showKeybindHelp) {
+                        if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                          panelContent.showKeybindHelp = false;
+                          event.accepted = true;
+                        }
+                        return;
+                      }
+
                       const vimNavigationEnabled = Settings.data.notifications?.vimKeyboardNavigation === true;
                       const hasBlockingModifier = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) !== 0;
                       if (!hasBlockingModifier && event.text && event.text.length === 1) {
@@ -603,8 +612,9 @@ SmartPanel {
 
             NIconButton {
               icon: "keyboard"
-              tooltipText: I18n.tr("notifications.panel.normal-mode-keybinds-tooltip")
+              tooltipText: I18n.tr("notifications.panel.normal-mode-keybinds-open-tooltip")
               baseSize: Style.baseWidgetSize * 0.8
+              onClicked: panelContent.showKeybindHelp = true
             }
 
             NIconButton {
@@ -1101,6 +1111,57 @@ SmartPanel {
                 }
               }
             }
+          }
+        }
+      }
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      visible: panelContent.showKeybindHelp
+      color: Qt.alpha(Color.mScrim, 0.45)
+      radius: Style.radiusL
+      z: 20
+
+      MouseArea {
+        anchors.fill: parent
+        onClicked: panelContent.showKeybindHelp = false
+      }
+
+      NBox {
+        anchors.centerIn: parent
+        width: Math.min(parent.width - Style.marginXL * 2, Math.round(420 * Style.uiScaleRatio))
+        height: keybindHelpColumn.implicitHeight + Style.marginXL * 2
+
+        ColumnLayout {
+          id: keybindHelpColumn
+          anchors.fill: parent
+          anchors.margins: Style.marginL
+          spacing: Style.marginM
+
+          NText {
+            text: I18n.tr("notifications.panel.normal-mode-keybinds-title")
+            pointSize: Style.fontSizeM
+            font.weight: Style.fontWeightBold
+            color: Color.mOnSurface
+          }
+
+          NText {
+            Layout.fillWidth: true
+            text: I18n.tr("notifications.panel.normal-mode-keybinds-text")
+            pointSize: Style.fontSizeS
+            color: Color.mOnSurfaceVariant
+            wrapMode: Text.WordWrap
+          }
+
+          Item {
+            Layout.fillHeight: true
+          }
+
+          NButton {
+            text: I18n.tr("common.close")
+            Layout.alignment: Qt.AlignRight
+            onClicked: panelContent.showKeybindHelp = false
           }
         }
       }
