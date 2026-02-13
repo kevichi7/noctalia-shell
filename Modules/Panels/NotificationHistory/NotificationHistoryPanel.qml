@@ -29,11 +29,19 @@ SmartPanel {
   }
 
   function onUpPressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp) {
+      root.contentItem.scrollHelpOverlayUp();
+      return;
+    }
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectRelative(-1);
   }
 
   function onDownPressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp) {
+      root.contentItem.scrollHelpOverlayDown();
+      return;
+    }
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectRelative(1);
   }
@@ -46,21 +54,33 @@ SmartPanel {
   }
 
   function onLeftPressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp)
+      return;
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectPreviousRange();
   }
 
   function onRightPressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp)
+      return;
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectNextRange();
   }
 
   function onHomePressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp) {
+      root.contentItem.scrollHelpOverlayHome();
+      return;
+    }
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectBoundary(false);
   }
 
   function onEndPressed() {
+    if (root.contentItem && root.contentItem.showKeybindHelp) {
+      root.contentItem.scrollHelpOverlayEnd();
+      return;
+    }
     if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectBoundary(true);
   }
@@ -120,10 +140,97 @@ SmartPanel {
     function handleHelpOverlayKey(event) {
       if (!showKeybindHelp)
         return false;
+
+      var helpFlickable = keybindHelpScroll && keybindHelpScroll.contentItem ? keybindHelpScroll.contentItem : null;
+      if (event.key === Qt.Key_Up) {
+        scrollHelpOverlayBy(-Math.max(24, Style.baseWidgetSize * 0.6));
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Down) {
+        scrollHelpOverlayBy(Math.max(24, Style.baseWidgetSize * 0.6));
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_PageUp) {
+        scrollHelpOverlayBy(-(helpFlickable ? helpFlickable.height * 0.85 : 0));
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_PageDown) {
+        scrollHelpOverlayBy(helpFlickable ? helpFlickable.height * 0.85 : 0);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Home) {
+        scrollHelpOverlayHome();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_End) {
+        scrollHelpOverlayEnd();
+        event.accepted = true;
+        return true;
+      }
+      if (vimNavigationEnabled && event.text && event.text.length === 1) {
+        var vimKey = event.text.toLowerCase();
+        if (vimKey === "k") {
+          scrollHelpOverlayBy(-Math.max(24, Style.baseWidgetSize * 0.6));
+          event.accepted = true;
+          return true;
+        }
+        if (vimKey === "j") {
+          scrollHelpOverlayBy(Math.max(24, Style.baseWidgetSize * 0.6));
+          event.accepted = true;
+          return true;
+        }
+      }
+
       if (event.text === "?" || event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
         showKeybindHelp = false;
         event.accepted = true;
+        return true;
       }
+      // Consume all keys while help is open to prevent background notification navigation.
+      event.accepted = true;
+      return true;
+    }
+
+    function _helpOverlayFlickable() {
+      return keybindHelpScroll && keybindHelpScroll.contentItem ? keybindHelpScroll.contentItem : null;
+    }
+
+    function scrollHelpOverlayBy(delta) {
+      var helpFlickable = _helpOverlayFlickable();
+      if (!helpFlickable)
+        return false;
+      var maxY = Math.max(0, helpFlickable.contentHeight - helpFlickable.height);
+      var nextY = Math.max(0, Math.min(maxY, helpFlickable.contentY + delta));
+      helpFlickable.contentY = nextY;
+      return true;
+    }
+
+    function scrollHelpOverlayUp() {
+      return scrollHelpOverlayBy(-Math.max(24, Style.baseWidgetSize * 0.6));
+    }
+
+    function scrollHelpOverlayDown() {
+      return scrollHelpOverlayBy(Math.max(24, Style.baseWidgetSize * 0.6));
+    }
+
+    function scrollHelpOverlayHome() {
+      var helpFlickable = _helpOverlayFlickable();
+      if (!helpFlickable)
+        return false;
+      helpFlickable.contentY = 0;
+      return true;
+    }
+
+    function scrollHelpOverlayEnd() {
+      var helpFlickable = _helpOverlayFlickable();
+      if (!helpFlickable)
+        return false;
+      helpFlickable.contentY = Math.max(0, helpFlickable.contentHeight - helpFlickable.height);
       return true;
     }
 
