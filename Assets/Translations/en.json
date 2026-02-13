@@ -595,7 +595,15 @@
     "panel": {
       "click-to-expand": "Click to expand",
       "description": "Your notifications will show up here as they arrive.",
-      "no-notifications": "No notifications"
+      "no-notifications": "No notifications",
+      "normal-mode-keybinds-open-tooltip": "Show normal mode keybinds",
+      "normal-mode-keybinds-title": "Normal mode keybinds",
+      "normal-mode-keybinds-close-hint-enabled": "Press Esc or ? to close",
+      "normal-mode-keybinds-close-hint-disabled": "Press Esc to close",
+      "normal-mode-keybinds-text": "- ?: toggle this help panel\n- Up/Down: select notification\n- Left/Right: switch range\n- Home/End: jump to first/last\n- Enter: invoke selected action (or expand)\n- Tab/Shift+Tab: cycle actions\n- 1-9: invoke action by number\n- Delete/Backspace: dismiss selected\n- Ctrl+Shift+Delete: clear all history\n- Esc: close panel",
+      "normal-mode-keybinds-disabled-text": "Keyboard controls are disabled for notification history.\n\nEnable \"History keyboard controls\" in Notifications > History to use these shortcuts.",
+      "vim-keybinds-title": "Vim mode (optional)",
+      "vim-keybinds-text": "- j/k: move selection down/up\n- h/l: switch range left/right\n- g/G: jump to first/last notification\n- x: dismiss selected notification"
     },
     "range": {
       "earlier": "Earlier",
@@ -1253,11 +1261,15 @@
       "duration-title": "Notification duration",
       "history-critical-urgency-description": "Save critical priority notifications to history.",
       "history-critical-urgency-label": "Save critical urgency to history",
+      "history-keyboard-navigation-description": "Enable keyboard shortcuts in notification history.",
+      "history-keyboard-navigation-label": "History keyboard controls",
       "history-desc": "Control which notifications are saved to history based on their urgency level.",
       "history-low-urgency-description": "Save low priority notifications to history.",
       "history-low-urgency-label": "Save low urgency to history",
       "history-normal-urgency-description": "Save normal priority notifications to history.",
       "history-normal-urgency-label": "Save normal urgency to history",
+      "history-vim-navigation-description": "Enable Vim-style keys in notification history: h/l switch ranges, j/k move, g/G jump.",
+      "history-vim-navigation-label": "Vim keyboard navigation",
       "monitors-desc": "Show notification on specific monitors. Defaults to all if none are chosen.",
       "settings-always-on-top-description": "Display notifications above fullscreen windows and other layers.",
       "settings-background-opacity-description": "Adjust the opacity of notification backgrounds.",

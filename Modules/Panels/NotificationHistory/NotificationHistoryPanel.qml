@@ -15,14 +15,60 @@ SmartPanel {
 
   preferredWidth: Math.round(440 * Style.uiScaleRatio)
   preferredHeight: Math.round(540 * Style.uiScaleRatio)
+  property var contentItem: null
 
   onOpened: {
     NotificationService.updateLastSeenTs();
+    Qt.callLater(() => {
+                   if (!root.contentItem)
+                     return;
+                   root.contentItem.forceActiveFocus();
+                   if (root.contentItem.keyboardControlEnabled)
+                     root.contentItem.ensureKeyboardSelection();
+                 });
+  }
+
+  function onUpPressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectRelative(-1);
+  }
+
+  function onDownPressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectRelative(1);
+  }
+
+  function onEnterPressed() {
+    if (!root.contentItem || !root.contentItem.keyboardControlEnabled)
+      return;
+    if (!root.contentItem.invokeSelectedAction())
+      root.contentItem.toggleSelectedExpand();
+  }
+
+  function onLeftPressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectPreviousRange();
+  }
+
+  function onRightPressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectNextRange();
+  }
+
+  function onHomePressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectBoundary(false);
+  }
+
+  function onEndPressed() {
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
+      root.contentItem.selectBoundary(true);
   }
 
   panelContent: Rectangle {
     id: panelContent
     color: "transparent"
+    focus: true
 
     // Calculate content height based on header + tabs (if visible) + content
     property real calculatedHeight: {
@@ -41,6 +87,410 @@ SmartPanel {
     // 0 = All, 1 = Today, 2 = Yesterday, 3 = Earlier
     property int currentRange: 1  // start on Today by default
     property bool groupByDate: true
+    property bool showKeybindHelp: false
+    property bool keyboardControlEnabled: Settings.data.notifications?.historyKeyboardNavigationEnabled !== false
+    property bool vimNavigationEnabled: Settings.data.notifications?.vimKeyboardNavigation === true
+    property string keyboardSelectedId: ""
+    property string keyboardActionNotificationId: ""
+    property int keyboardActionIndex: -1
+
+    function clearActionSelection() {
+      keyboardActionNotificationId = "";
+      keyboardActionIndex = -1;
+    }
+
+    function keybindHelpText() {
+      if (!keyboardControlEnabled)
+        return I18n.tr("notifications.panel.normal-mode-keybinds-disabled-text");
+
+      var text = I18n.tr("notifications.panel.normal-mode-keybinds-text");
+      if (vimNavigationEnabled) {
+        text += "\n\n" + I18n.tr("notifications.panel.vim-keybinds-title");
+        text += "\n" + I18n.tr("notifications.panel.vim-keybinds-text");
+      }
+      return text;
+    }
+
+    function keybindHelpCloseHintText() {
+      if (keyboardControlEnabled)
+        return I18n.tr("notifications.panel.normal-mode-keybinds-close-hint-enabled");
+      return I18n.tr("notifications.panel.normal-mode-keybinds-close-hint-disabled");
+    }
+
+    function handleHelpOverlayKey(event) {
+      if (!showKeybindHelp)
+        return false;
+      if (event.text === "?" || event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        showKeybindHelp = false;
+        event.accepted = true;
+      }
+      return true;
+    }
+
+    function handleHelpToggleKey(event, hasBlockingModifier) {
+      if (hasBlockingModifier || event.text !== "?")
+        return false;
+      showKeybindHelp = !showKeybindHelp;
+      event.accepted = true;
+      return true;
+    }
+
+    function handleActionNumberKey(event, hasBlockingModifier) {
+      if (hasBlockingModifier || !event.text || event.text.length !== 1)
+        return false;
+      var digit = parseInt(event.text, 10);
+      if (isNaN(digit) || digit < 1 || digit > 9)
+        return false;
+      if (invokeActionByNumber(digit))
+        event.accepted = true;
+      return event.accepted;
+    }
+
+    function handleVimNavigationKey(event, hasBlockingModifier) {
+      if (!vimNavigationEnabled || hasBlockingModifier || !event.text || event.text.length !== 1)
+        return false;
+
+      var vimKey = event.text;
+      var vimKeyLower = vimKey.toLowerCase();
+      if (vimKeyLower === "j") {
+        selectRelative(1);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "k") {
+        selectRelative(-1);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "h") {
+        selectPreviousRange();
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "l") {
+        selectNextRange();
+        event.accepted = true;
+        return true;
+      }
+      if (vimKey === "g") {
+        selectBoundary(false);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKey === "G") {
+        selectBoundary(true);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "x") {
+        if (dismissSelectedNotification())
+          event.accepted = true;
+        return true;
+      }
+      return false;
+    }
+
+    function handleStandardNavigationKey(event) {
+      if (event.key === Qt.Key_Up) {
+        selectRelative(-1);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Down) {
+        selectRelative(1);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Left) {
+        selectPreviousRange();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Right) {
+        selectNextRange();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Home) {
+        selectBoundary(false);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_End) {
+        selectBoundary(true);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        if (!invokeSelectedAction())
+          toggleSelectedExpand();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Tab) {
+        if (selectActionRelative(1))
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Backtab) {
+        if (selectActionRelative(-1))
+          event.accepted = true;
+        return true;
+      }
+      if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)
+          && (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)) {
+        if (clearAllNotifications())
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+        if (dismissSelectedNotification())
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Escape) {
+        root.close();
+        event.accepted = true;
+        return true;
+      }
+      return false;
+    }
+
+    function isDelegateNavigable(delegateItem) {
+      return delegateItem && delegateItem.visible && !delegateItem.isRemoving && delegateItem.height > 0;
+    }
+
+    function visibleDelegates() {
+      var delegates = [];
+      if (!notificationRepeater)
+        return delegates;
+      for (var i = 0; i < notificationRepeater.count; ++i) {
+        var item = notificationRepeater.itemAt(i);
+        if (isDelegateNavigable(item))
+          delegates.push(item);
+      }
+      return delegates;
+    }
+
+    function ensureDelegateVisible(delegateItem) {
+      if (!delegateItem || !scrollView || !scrollView.contentItem)
+        return;
+
+      var flickable = scrollView.contentItem;
+      var topY = delegateItem.y;
+      var bottomY = topY + delegateItem.height;
+      var viewportTop = flickable.contentY;
+      var viewportBottom = viewportTop + flickable.height;
+      var targetY = flickable.contentY;
+
+      if (topY < viewportTop) {
+        targetY = topY;
+      } else if (bottomY > viewportBottom) {
+        targetY = bottomY - flickable.height;
+      }
+
+      var maxY = Math.max(0, flickable.contentHeight - flickable.height);
+      flickable.contentY = Math.max(0, Math.min(targetY, maxY));
+    }
+
+    function ensureKeyboardSelection() {
+      var delegates = visibleDelegates();
+      if (delegates.length === 0) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+        return false;
+      }
+
+      if (keyboardSelectedId !== "") {
+        for (var i = 0; i < delegates.length; ++i) {
+          if (delegates[i].notificationId === keyboardSelectedId) {
+            ensureDelegateVisible(delegates[i]);
+            return true;
+          }
+        }
+      }
+
+      keyboardSelectedId = delegates[0].notificationId;
+      clearActionSelection();
+      ensureDelegateVisible(delegates[0]);
+      return true;
+    }
+
+    function selectRelative(delta) {
+      var delegates = visibleDelegates();
+      if (delegates.length === 0) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+        return false;
+      }
+
+      var currentIndex = -1;
+      for (var i = 0; i < delegates.length; ++i) {
+        if (delegates[i].notificationId === keyboardSelectedId) {
+          currentIndex = i;
+          break;
+        }
+      }
+
+      if (currentIndex < 0)
+        currentIndex = delta > 0 ? -1 : delegates.length;
+
+      var nextIndex = Math.max(0, Math.min(delegates.length - 1, currentIndex + delta));
+      var previousSelectedId = keyboardSelectedId;
+      keyboardSelectedId = delegates[nextIndex].notificationId;
+      if (previousSelectedId !== keyboardSelectedId)
+        clearActionSelection();
+      ensureDelegateVisible(delegates[nextIndex]);
+      return true;
+    }
+
+    function selectBoundary(toEnd) {
+      var delegates = visibleDelegates();
+      if (delegates.length === 0) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+        return false;
+      }
+
+      var index = toEnd ? delegates.length - 1 : 0;
+      var previousSelectedId = keyboardSelectedId;
+      keyboardSelectedId = delegates[index].notificationId;
+      if (previousSelectedId !== keyboardSelectedId)
+        clearActionSelection();
+      ensureDelegateVisible(delegates[index]);
+      return true;
+    }
+
+    function selectedDelegate() {
+      if (!notificationRepeater || keyboardSelectedId === "")
+        return null;
+      for (var i = 0; i < notificationRepeater.count; ++i) {
+        var item = notificationRepeater.itemAt(i);
+        if (item && item.notificationId === keyboardSelectedId)
+          return item;
+      }
+      return null;
+    }
+
+    function toggleSelectedExpand() {
+      if (!ensureKeyboardSelection())
+        return false;
+
+      var delegateItem = selectedDelegate();
+      if (!delegateItem || !delegateItem.canExpand)
+        return false;
+
+      if (scrollView.expandedId === delegateItem.notificationId) {
+        scrollView.expandedId = "";
+      } else {
+        scrollView.expandedId = delegateItem.notificationId;
+      }
+
+      ensureDelegateVisible(delegateItem);
+      return true;
+    }
+
+    function actionCountForSelected() {
+      var delegateItem = selectedDelegate();
+      if (!delegateItem || !delegateItem.actionsList)
+        return 0;
+      return delegateItem.actionsList.length;
+    }
+
+    function selectActionRelative(delta) {
+      if (!ensureKeyboardSelection())
+        return false;
+
+      var actionCount = actionCountForSelected();
+      if (actionCount <= 0)
+        return false;
+
+      keyboardActionNotificationId = keyboardSelectedId;
+      if (keyboardActionIndex < 0 || keyboardActionIndex >= actionCount) {
+        keyboardActionIndex = delta >= 0 ? 0 : actionCount - 1;
+      } else {
+        keyboardActionIndex = (keyboardActionIndex + delta + actionCount) % actionCount;
+      }
+      return true;
+    }
+
+    function invokeSelectedAction() {
+      if (!ensureKeyboardSelection())
+        return false;
+      if (keyboardActionNotificationId !== keyboardSelectedId || keyboardActionIndex < 0)
+        return false;
+
+      var delegateItem = selectedDelegate();
+      if (!delegateItem || !delegateItem.actionsList)
+        return false;
+      if (keyboardActionIndex >= delegateItem.actionsList.length)
+        return false;
+
+      var action = delegateItem.actionsList[keyboardActionIndex];
+      if (!action || !action.identifier)
+        return false;
+
+      NotificationService.invokeAction(delegateItem.notificationId, action.identifier);
+      return true;
+    }
+
+    function invokeActionByNumber(numberKey) {
+      if (!ensureKeyboardSelection())
+        return false;
+      var delegateItem = selectedDelegate();
+      if (!delegateItem || !delegateItem.actionsList)
+        return false;
+
+      var actionIndex = numberKey - 1;
+      if (actionIndex < 0 || actionIndex >= delegateItem.actionsList.length)
+        return false;
+
+      keyboardActionNotificationId = delegateItem.notificationId;
+      keyboardActionIndex = actionIndex;
+      var action = delegateItem.actionsList[actionIndex];
+      if (!action || !action.identifier)
+        return false;
+      NotificationService.invokeAction(delegateItem.notificationId, action.identifier);
+      return true;
+    }
+
+    function dismissSelectedNotification() {
+      if (!ensureKeyboardSelection())
+        return false;
+
+      var delegateItem = selectedDelegate();
+      if (!delegateItem || delegateItem.isRemoving)
+        return false;
+
+      clearActionSelection();
+      delegateItem.swipeOffset = 1;
+      delegateItem.dismissBySwipe();
+      return true;
+    }
+
+    function clearAllNotifications() {
+      NotificationService.clearHistory();
+      root.close();
+      return true;
+    }
+
+    function selectNextRange() {
+      if (!groupByDate || !tabsBox.visible)
+        return false;
+      currentRange = Math.min(3, currentRange + 1);
+      clearActionSelection();
+      Qt.callLater(() => ensureKeyboardSelection());
+      return true;
+    }
+
+    function selectPreviousRange() {
+      if (!groupByDate || !tabsBox.visible)
+        return false;
+      currentRange = Math.max(0, currentRange - 1);
+      clearActionSelection();
+      Qt.callLater(() => ensureKeyboardSelection());
+      return true;
+    }
 
     // Helper functions (lazy-loaded with panelContent)
     function dateOnly(d) {
@@ -114,17 +564,57 @@ SmartPanel {
     }
 
     Component.onCompleted: {
+      root.contentItem = panelContent;
       recalcRangeCounts();
       // Initialize lastKnownDate
       lastKnownDate = getDateKey(new Date());
+      Qt.callLater(() => {
+                     if (keyboardControlEnabled)
+                       ensureKeyboardSelection();
+                   });
     }
+
+    onKeyboardControlEnabledChanged: {
+      if (!keyboardControlEnabled) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+      } else {
+        Qt.callLater(() => ensureKeyboardSelection());
+      }
+    }
+
+    onCurrentRangeChanged: Qt.callLater(() => {
+                           if (keyboardControlEnabled)
+                             ensureKeyboardSelection();
+                         })
 
     Connections {
       target: NotificationService.historyList
       function onCountChanged() {
         panelContent.recalcRangeCounts();
+        Qt.callLater(() => {
+                       if (panelContent.keyboardControlEnabled)
+                         panelContent.ensureKeyboardSelection();
+                     });
       }
     }
+
+    Keys.onPressed: event => {
+                      if (panelContent.handleHelpOverlayKey(event))
+                        return;
+
+                      if (!panelContent.keyboardControlEnabled)
+                        return;
+
+                      var hasBlockingModifier = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) !== 0;
+                      if (panelContent.handleHelpToggleKey(event, hasBlockingModifier))
+                        return;
+                      if (panelContent.handleActionNumberKey(event, hasBlockingModifier))
+                        return;
+                      if (panelContent.handleVimNavigationKey(event, hasBlockingModifier))
+                        return;
+                      panelContent.handleStandardNavigationKey(event);
+                    }
 
     // Timer to check for day changes at midnight
     Timer {
@@ -192,6 +682,14 @@ SmartPanel {
                 // Close panel as there is nothing more to see.
                 root.close();
               }
+            }
+
+            NIconButton {
+              icon: "keyboard"
+              tooltipText: I18n.tr("notifications.panel.normal-mode-keybinds-open-tooltip")
+              visible: panelContent.keyboardControlEnabled
+              baseSize: Style.baseWidgetSize * 0.8
+              onClicked: panelContent.showKeybindHelp = true
             }
 
             NIconButton {
@@ -325,6 +823,7 @@ SmartPanel {
                 spacing: Style.marginM
 
                 Repeater {
+                  id: notificationRepeater
                   model: NotificationService.historyList
 
                   delegate: Item {
@@ -336,6 +835,7 @@ SmartPanel {
                     property string notificationId: model.id
                     property bool isExpanded: scrollView.expandedId === notificationId
                     property bool canExpand: summaryText.truncated || bodyText.truncated
+                    property bool isKeyboardSelected: panelContent.keyboardControlEnabled && panelContent.keyboardSelectedId === notificationId
                     property real swipeOffset: 0
                     property real pressGlobalX: 0
                     property real pressGlobalY: 0
@@ -418,8 +918,8 @@ SmartPanel {
                     Rectangle {
                       anchors.fill: parent
                       radius: Style.radiusM
-                      color: Color.mSurfaceVariant
-                      border.color: Settings.data.ui.boxBorderEnabled ? Qt.alpha(Color.mOutline, Style.opacityHeavy) : "transparent"
+                      color: notificationDelegate.isKeyboardSelected ? Qt.alpha(Color.mPrimary, Style.opacityLight) : Color.mSurfaceVariant
+                      border.color: notificationDelegate.isKeyboardSelected ? Qt.alpha(Color.mPrimary, Style.opacityHeavy) : (Settings.data.ui.boxBorderEnabled ? Qt.alpha(Color.mOutline, Style.opacityHeavy) : "transparent")
                       border.width: Style.borderS
 
                       Behavior on color {
@@ -439,7 +939,10 @@ SmartPanel {
                       cursorShape: notificationDelegate.canExpand ? Qt.PointingHandCursor : Qt.ArrowCursor
                       onPressed: mouse => {
                                    if (mouse.button !== Qt.LeftButton)
-                                   return;
+                                     return;
+                                   panelContent.clearActionSelection();
+                                   panelContent.keyboardSelectedId = notificationId;
+                                   panelContent.ensureDelegateVisible(notificationDelegate);
                                    const globalPoint = historyInteractionArea.mapToGlobal(mouse.x, mouse.y);
                                    notificationDelegate.pressGlobalX = globalPoint.x;
                                    notificationDelegate.pressGlobalY = globalPoint.y;
@@ -644,14 +1147,24 @@ SmartPanel {
                               delegate: NButton {
                                 text: modelData.text
                                 fontSize: Style.fontSizeS
-                                backgroundColor: Color.mPrimary
-                                textColor: Color.mOnPrimary
-                                outlined: false
+                                property int actionIndex: index
+                                property bool isKeyboardActionSelected: panelContent.keyboardControlEnabled
+                                    && panelContent.keyboardSelectedId === notificationDelegate.notificationId
+                                    && panelContent.keyboardActionNotificationId === notificationDelegate.notificationId
+                                    && panelContent.keyboardActionIndex === actionIndex
+                                backgroundColor: isKeyboardActionSelected ? Color.mSecondary : Color.mPrimary
+                                textColor: isKeyboardActionSelected ? Color.mOnSecondary : Color.mOnPrimary
+                                hoverColor: isKeyboardActionSelected ? Qt.lighter(Color.mSecondary, 1.08) : Color.mHover
+                                outlined: !isKeyboardActionSelected
+                                fontWeight: isKeyboardActionSelected ? Style.fontWeightBold : Style.fontWeightSemiBold
                                 implicitHeight: 24
 
                                 // Capture modelData in a property to avoid reference errors
                                 property var actionData: modelData
                                 onClicked: {
+                                  panelContent.keyboardSelectedId = notificationDelegate.notificationId;
+                                  panelContent.keyboardActionNotificationId = notificationDelegate.notificationId;
+                                  panelContent.keyboardActionIndex = actionIndex;
                                   NotificationService.invokeAction(notificationDelegate.notificationId, actionData.identifier);
                                 }
                               }
@@ -676,6 +1189,68 @@ SmartPanel {
                 }
               }
             }
+          }
+        }
+      }
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      visible: panelContent.showKeybindHelp
+      color: Qt.alpha(Color.mSurface, 0.28)
+      radius: Style.radiusL
+      z: 20
+
+      MouseArea {
+        anchors.fill: parent
+        onClicked: panelContent.showKeybindHelp = false
+      }
+
+      NBox {
+        anchors.centerIn: parent
+        width: Math.min(parent.width - Style.marginXL * 2, Math.round(420 * Style.uiScaleRatio))
+        height: Math.min(parent.height - Style.marginXL * 2, Math.round(360 * Style.uiScaleRatio))
+
+        ColumnLayout {
+          id: keybindHelpColumn
+          anchors.fill: parent
+          anchors.margins: Style.marginL
+          spacing: Style.marginM
+
+          NText {
+            text: I18n.tr("notifications.panel.normal-mode-keybinds-title")
+            pointSize: Style.fontSizeM
+            font.weight: Style.fontWeightBold
+            color: Color.mOnSurface
+          }
+
+          NText {
+            text: panelContent.keybindHelpCloseHintText()
+            pointSize: Style.fontSizeXS
+            color: Color.mOnSurfaceVariant
+          }
+
+          NScrollView {
+            id: keybindHelpScroll
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            horizontalPolicy: ScrollBar.AlwaysOff
+            verticalPolicy: ScrollBar.AsNeeded
+            reserveScrollbarSpace: false
+
+            NText {
+              width: keybindHelpScroll.availableWidth
+              text: panelContent.keybindHelpText()
+              pointSize: Style.fontSizeS
+              color: Color.mOnSurfaceVariant
+              wrapMode: Text.WordWrap
+            }
+          }
+
+          NButton {
+            text: I18n.tr("common.close")
+            Layout.alignment: Qt.AlignRight
+            onClicked: panelContent.showKeybindHelp = false
           }
         }
       }
