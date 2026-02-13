@@ -456,7 +456,7 @@ SmartPanel {
 
     Keys.onPressed: event => {
                       if (panelContent.showKeybindHelp) {
-                        if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (event.text === "?" || event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                           panelContent.showKeybindHelp = false;
                           event.accepted = true;
                         }
