@@ -598,6 +598,8 @@
       "no-notifications": "No notifications",
       "normal-mode-keybinds-open-tooltip": "Show normal mode keybinds",
       "normal-mode-keybinds-title": "Normal mode keybinds",
+      "normal-mode-keybinds-close-hint-enabled": "Press Esc or ? to close",
+      "normal-mode-keybinds-close-hint-disabled": "Press Esc to close",
       "normal-mode-keybinds-text": "- ?: toggle this help panel\n- Up/Down: select notification\n- Left/Right: switch range\n- Home/End: jump to first/last\n- Enter: invoke selected action (or expand)\n- Tab/Shift+Tab: cycle actions\n- 1-9: invoke action by number\n- Delete/Backspace: dismiss selected\n- Ctrl+Shift+Delete: clear all history\n- Esc: close panel",
       "normal-mode-keybinds-disabled-text": "Keyboard controls are disabled for notification history.\n\nEnable \"History keyboard controls\" in Notifications > History to use these shortcuts.",
       "vim-keybinds-title": "Vim mode (optional)",

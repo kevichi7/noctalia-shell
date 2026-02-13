@@ -111,6 +111,151 @@ SmartPanel {
       return text;
     }
 
+    function keybindHelpCloseHintText() {
+      if (keyboardControlEnabled)
+        return I18n.tr("notifications.panel.normal-mode-keybinds-close-hint-enabled");
+      return I18n.tr("notifications.panel.normal-mode-keybinds-close-hint-disabled");
+    }
+
+    function handleHelpOverlayKey(event) {
+      if (!showKeybindHelp)
+        return false;
+      if (event.text === "?" || event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        showKeybindHelp = false;
+        event.accepted = true;
+      }
+      return true;
+    }
+
+    function handleHelpToggleKey(event, hasBlockingModifier) {
+      if (hasBlockingModifier || event.text !== "?")
+        return false;
+      showKeybindHelp = !showKeybindHelp;
+      event.accepted = true;
+      return true;
+    }
+
+    function handleActionNumberKey(event, hasBlockingModifier) {
+      if (hasBlockingModifier || !event.text || event.text.length !== 1)
+        return false;
+      var digit = parseInt(event.text, 10);
+      if (isNaN(digit) || digit < 1 || digit > 9)
+        return false;
+      if (invokeActionByNumber(digit))
+        event.accepted = true;
+      return event.accepted;
+    }
+
+    function handleVimNavigationKey(event, hasBlockingModifier) {
+      if (!vimNavigationEnabled || hasBlockingModifier || !event.text || event.text.length !== 1)
+        return false;
+
+      var vimKey = event.text;
+      var vimKeyLower = vimKey.toLowerCase();
+      if (vimKeyLower === "j") {
+        selectRelative(1);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "k") {
+        selectRelative(-1);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "h") {
+        selectPreviousRange();
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "l") {
+        selectNextRange();
+        event.accepted = true;
+        return true;
+      }
+      if (vimKey === "g") {
+        selectBoundary(false);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKey === "G") {
+        selectBoundary(true);
+        event.accepted = true;
+        return true;
+      }
+      if (vimKeyLower === "x") {
+        if (dismissSelectedNotification())
+          event.accepted = true;
+        return true;
+      }
+      return false;
+    }
+
+    function handleStandardNavigationKey(event) {
+      if (event.key === Qt.Key_Up) {
+        selectRelative(-1);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Down) {
+        selectRelative(1);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Left) {
+        selectPreviousRange();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Right) {
+        selectNextRange();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Home) {
+        selectBoundary(false);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_End) {
+        selectBoundary(true);
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        if (!invokeSelectedAction())
+          toggleSelectedExpand();
+        event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Tab) {
+        if (selectActionRelative(1))
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Backtab) {
+        if (selectActionRelative(-1))
+          event.accepted = true;
+        return true;
+      }
+      if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)
+          && (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)) {
+        if (clearAllNotifications())
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+        if (dismissSelectedNotification())
+          event.accepted = true;
+        return true;
+      }
+      if (event.key === Qt.Key_Escape) {
+        root.close();
+        event.accepted = true;
+        return true;
+      }
+      return false;
+    }
+
     function isDelegateNavigable(delegateItem) {
       return delegateItem && delegateItem.visible && !delegateItem.isRemoving && delegateItem.height > 0;
     }
@@ -455,137 +600,20 @@ SmartPanel {
     }
 
     Keys.onPressed: event => {
-                      if (panelContent.showKeybindHelp) {
-                        if (event.text === "?" || event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                          panelContent.showKeybindHelp = false;
-                          event.accepted = true;
-                        }
+                      if (panelContent.handleHelpOverlayKey(event))
                         return;
-                      }
 
                       if (!panelContent.keyboardControlEnabled)
                         return;
 
-                      const vimNavigationEnabled = panelContent.vimNavigationEnabled;
-                      const hasBlockingModifier = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) !== 0;
-                      if (!hasBlockingModifier && event.text === "?") {
-                        panelContent.showKeybindHelp = !panelContent.showKeybindHelp;
-                        event.accepted = true;
+                      var hasBlockingModifier = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) !== 0;
+                      if (panelContent.handleHelpToggleKey(event, hasBlockingModifier))
                         return;
-                      }
-                      if (!hasBlockingModifier && event.text && event.text.length === 1) {
-                        const digit = parseInt(event.text, 10);
-                        if (!isNaN(digit) && digit >= 1 && digit <= 9) {
-                          if (panelContent.invokeActionByNumber(digit)) {
-                            event.accepted = true;
-                            return;
-                          }
-                        }
-                      }
-
-                      if (vimNavigationEnabled && !hasBlockingModifier && event.text && event.text.length === 1) {
-                        const vimKey = event.text;
-                        const vimKeyLower = vimKey.toLowerCase();
-                        if (vimKeyLower === "j") {
-                          panelContent.selectRelative(1);
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKeyLower === "k") {
-                          panelContent.selectRelative(-1);
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKeyLower === "h") {
-                          panelContent.selectPreviousRange();
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKeyLower === "l") {
-                          panelContent.selectNextRange();
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKey === "g") {
-                          panelContent.selectBoundary(false);
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKey === "G") {
-                          panelContent.selectBoundary(true);
-                          event.accepted = true;
-                          return;
-                        }
-                        if (vimKeyLower === "x") {
-                          if (panelContent.dismissSelectedNotification())
-                            event.accepted = true;
-                          return;
-                        }
-                      }
-
-                      if (event.key === Qt.Key_Up) {
-                        panelContent.selectRelative(-1);
-                        event.accepted = true;
+                      if (panelContent.handleActionNumberKey(event, hasBlockingModifier))
                         return;
-                      }
-                      if (event.key === Qt.Key_Down) {
-                        panelContent.selectRelative(1);
-                        event.accepted = true;
+                      if (panelContent.handleVimNavigationKey(event, hasBlockingModifier))
                         return;
-                      }
-                      if (event.key === Qt.Key_Left) {
-                        panelContent.selectPreviousRange();
-                        event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Right) {
-                        panelContent.selectNextRange();
-                        event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Home) {
-                        panelContent.selectBoundary(false);
-                        event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_End) {
-                        panelContent.selectBoundary(true);
-                        event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (!panelContent.invokeSelectedAction())
-                          panelContent.toggleSelectedExpand();
-                        event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Tab) {
-                        if (panelContent.selectActionRelative(1)) {
-                          event.accepted = true;
-                          return;
-                        }
-                      }
-                      if (event.key === Qt.Key_Backtab) {
-                        if (panelContent.selectActionRelative(-1)) {
-                          event.accepted = true;
-                          return;
-                        }
-                      }
-                      if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)
-                          && (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)) {
-                        if (panelContent.clearAllNotifications())
-                          event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
-                        if (panelContent.dismissSelectedNotification())
-                          event.accepted = true;
-                        return;
-                      }
-                      if (event.key === Qt.Key_Escape) {
-                        root.close();
-                        event.accepted = true;
-                      }
+                      panelContent.handleStandardNavigationKey(event);
                     }
 
     // Timer to check for day changes at midnight
@@ -659,6 +687,7 @@ SmartPanel {
             NIconButton {
               icon: "keyboard"
               tooltipText: I18n.tr("notifications.panel.normal-mode-keybinds-open-tooltip")
+              visible: panelContent.keyboardControlEnabled
               baseSize: Style.baseWidgetSize * 0.8
               onClicked: panelContent.showKeybindHelp = true
             }
@@ -1193,6 +1222,12 @@ SmartPanel {
             pointSize: Style.fontSizeM
             font.weight: Style.fontWeightBold
             color: Color.mOnSurface
+          }
+
+          NText {
+            text: panelContent.keybindHelpCloseHintText()
+            pointSize: Style.fontSizeXS
+            color: Color.mOnSurfaceVariant
           }
 
           NScrollView {
