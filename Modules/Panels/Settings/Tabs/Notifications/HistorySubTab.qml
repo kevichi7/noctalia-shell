@@ -34,8 +34,17 @@ ColumnLayout {
   }
 
   NToggle {
+    label: I18n.tr("panels.notifications.history-keyboard-navigation-label")
+    description: I18n.tr("panels.notifications.history-keyboard-navigation-description")
+    checked: Settings.data.notifications?.historyKeyboardNavigationEnabled !== false
+    onToggled: checked => Settings.data.notifications.historyKeyboardNavigationEnabled = checked
+    defaultValue: Settings.getDefaultValue("notifications.historyKeyboardNavigationEnabled")
+  }
+
+  NToggle {
     label: I18n.tr("panels.notifications.history-vim-navigation-label")
     description: I18n.tr("panels.notifications.history-vim-navigation-description")
+    enabled: Settings.data.notifications?.historyKeyboardNavigationEnabled !== false
     checked: Settings.data.notifications?.vimKeyboardNavigation === true
     onToggled: checked => Settings.data.notifications.vimKeyboardNavigation = checked
     defaultValue: Settings.getDefaultValue("notifications.vimKeyboardNavigation")

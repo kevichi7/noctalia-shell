@@ -622,6 +622,7 @@ Singleton {
       property bool enableMediaToast: false
       property bool enableKeyboardLayoutToast: true
       property bool enableBatteryToast: true
+      property bool historyKeyboardNavigationEnabled: true
       property bool vimKeyboardNavigation: false
     }
 

@@ -23,44 +23,45 @@ SmartPanel {
                    if (!root.contentItem)
                      return;
                    root.contentItem.forceActiveFocus();
-                   root.contentItem.ensureKeyboardSelection();
+                   if (root.contentItem.keyboardControlEnabled)
+                     root.contentItem.ensureKeyboardSelection();
                  });
   }
 
   function onUpPressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectRelative(-1);
   }
 
   function onDownPressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectRelative(1);
   }
 
   function onEnterPressed() {
-    if (!root.contentItem)
+    if (!root.contentItem || !root.contentItem.keyboardControlEnabled)
       return;
     if (!root.contentItem.invokeSelectedAction())
       root.contentItem.toggleSelectedExpand();
   }
 
   function onLeftPressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectPreviousRange();
   }
 
   function onRightPressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectNextRange();
   }
 
   function onHomePressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectBoundary(false);
   }
 
   function onEndPressed() {
-    if (root.contentItem)
+    if (root.contentItem && root.contentItem.keyboardControlEnabled)
       root.contentItem.selectBoundary(true);
   }
 
@@ -87,6 +88,8 @@ SmartPanel {
     property int currentRange: 1  // start on Today by default
     property bool groupByDate: true
     property bool showKeybindHelp: false
+    property bool keyboardControlEnabled: Settings.data.notifications?.historyKeyboardNavigationEnabled !== false
+    property bool vimNavigationEnabled: Settings.data.notifications?.vimKeyboardNavigation === true
     property string keyboardSelectedId: ""
     property string keyboardActionNotificationId: ""
     property int keyboardActionIndex: -1
@@ -94,6 +97,18 @@ SmartPanel {
     function clearActionSelection() {
       keyboardActionNotificationId = "";
       keyboardActionIndex = -1;
+    }
+
+    function keybindHelpText() {
+      if (!keyboardControlEnabled)
+        return I18n.tr("notifications.panel.normal-mode-keybinds-disabled-text");
+
+      var text = I18n.tr("notifications.panel.normal-mode-keybinds-text");
+      if (vimNavigationEnabled) {
+        text += "\n\n" + I18n.tr("notifications.panel.vim-keybinds-title");
+        text += "\n" + I18n.tr("notifications.panel.vim-keybinds-text");
+      }
+      return text;
     }
 
     function isDelegateNavigable(delegateItem) {
@@ -408,16 +423,34 @@ SmartPanel {
       recalcRangeCounts();
       // Initialize lastKnownDate
       lastKnownDate = getDateKey(new Date());
-      Qt.callLater(() => ensureKeyboardSelection());
+      Qt.callLater(() => {
+                     if (keyboardControlEnabled)
+                       ensureKeyboardSelection();
+                   });
     }
 
-    onCurrentRangeChanged: Qt.callLater(() => ensureKeyboardSelection())
+    onKeyboardControlEnabledChanged: {
+      if (!keyboardControlEnabled) {
+        keyboardSelectedId = "";
+        clearActionSelection();
+      } else {
+        Qt.callLater(() => ensureKeyboardSelection());
+      }
+    }
+
+    onCurrentRangeChanged: Qt.callLater(() => {
+                           if (keyboardControlEnabled)
+                             ensureKeyboardSelection();
+                         })
 
     Connections {
       target: NotificationService.historyList
       function onCountChanged() {
         panelContent.recalcRangeCounts();
-        Qt.callLater(() => panelContent.ensureKeyboardSelection());
+        Qt.callLater(() => {
+                       if (panelContent.keyboardControlEnabled)
+                         panelContent.ensureKeyboardSelection();
+                     });
       }
     }
 
@@ -430,8 +463,16 @@ SmartPanel {
                         return;
                       }
 
-                      const vimNavigationEnabled = Settings.data.notifications?.vimKeyboardNavigation === true;
+                      if (!panelContent.keyboardControlEnabled)
+                        return;
+
+                      const vimNavigationEnabled = panelContent.vimNavigationEnabled;
                       const hasBlockingModifier = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) !== 0;
+                      if (!hasBlockingModifier && event.text === "?") {
+                        panelContent.showKeybindHelp = !panelContent.showKeybindHelp;
+                        event.accepted = true;
+                        return;
+                      }
                       if (!hasBlockingModifier && event.text && event.text.length === 1) {
                         const digit = parseInt(event.text, 10);
                         if (!isNaN(digit) && digit >= 1 && digit <= 9) {
@@ -760,7 +801,7 @@ SmartPanel {
                     property string notificationId: model.id
                     property bool isExpanded: scrollView.expandedId === notificationId
                     property bool canExpand: summaryText.truncated || bodyText.truncated
-                    property bool isKeyboardSelected: panelContent.keyboardSelectedId === notificationId
+                    property bool isKeyboardSelected: panelContent.keyboardControlEnabled && panelContent.keyboardSelectedId === notificationId
                     property real swipeOffset: 0
                     property real pressGlobalX: 0
                     property real pressGlobalY: 0
@@ -1073,12 +1114,15 @@ SmartPanel {
                                 text: modelData.text
                                 fontSize: Style.fontSizeS
                                 property int actionIndex: index
-                                property bool isKeyboardActionSelected: panelContent.keyboardSelectedId === notificationDelegate.notificationId
+                                property bool isKeyboardActionSelected: panelContent.keyboardControlEnabled
+                                    && panelContent.keyboardSelectedId === notificationDelegate.notificationId
                                     && panelContent.keyboardActionNotificationId === notificationDelegate.notificationId
                                     && panelContent.keyboardActionIndex === actionIndex
                                 backgroundColor: isKeyboardActionSelected ? Color.mSecondary : Color.mPrimary
-                                textColor: Color.mOnPrimary
-                                outlined: false
+                                textColor: isKeyboardActionSelected ? Color.mOnSecondary : Color.mOnPrimary
+                                hoverColor: isKeyboardActionSelected ? Qt.lighter(Color.mSecondary, 1.08) : Color.mHover
+                                outlined: !isKeyboardActionSelected
+                                fontWeight: isKeyboardActionSelected ? Style.fontWeightBold : Style.fontWeightSemiBold
                                 implicitHeight: 24
 
                                 // Capture modelData in a property to avoid reference errors
@@ -1148,7 +1192,7 @@ SmartPanel {
 
           NText {
             Layout.fillWidth: true
-            text: I18n.tr("notifications.panel.normal-mode-keybinds-text")
+            text: panelContent.keybindHelpText()
             pointSize: Style.fontSizeS
             color: Color.mOnSurfaceVariant
             wrapMode: Text.WordWrap
