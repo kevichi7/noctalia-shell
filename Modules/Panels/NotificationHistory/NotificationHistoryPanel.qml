@@ -602,6 +602,12 @@ SmartPanel {
             }
 
             NIconButton {
+              icon: "keyboard"
+              tooltipText: I18n.tr("notifications.panel.normal-mode-keybinds-tooltip")
+              baseSize: Style.baseWidgetSize * 0.8
+            }
+
+            NIconButton {
               icon: "close"
               tooltipText: I18n.tr("common.close")
               baseSize: Style.baseWidgetSize * 0.8

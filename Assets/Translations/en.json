@@ -595,7 +595,8 @@
     "panel": {
       "click-to-expand": "Click to expand",
       "description": "Your notifications will show up here as they arrive.",
-      "no-notifications": "No notifications"
+      "no-notifications": "No notifications",
+      "normal-mode-keybinds-tooltip": "Normal mode keybinds\n- Up/Down: select notification\n- Left/Right: switch range\n- Home/End: jump to first/last\n- Enter: invoke selected action (or expand)\n- Tab/Shift+Tab: cycle actions\n- 1-9: invoke action by number\n- Delete/Backspace: dismiss selected\n- Ctrl+Shift+Delete: clear all history\n- Esc: close panel"
     },
     "range": {
       "earlier": "Earlier",
