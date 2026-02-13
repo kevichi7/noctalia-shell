@@ -24,6 +24,7 @@ Singleton {
   property real lastSeenTs: 0
   // Volatile property that doesn't persist to settings (similar to noctaliaPerformanceMode)
   property bool doNotDisturb: false
+  property int historyGroupingWindowMs: 10 * 60 * 1000
 
   // Models
   property ListModel activeList: ListModel {}
@@ -413,6 +414,8 @@ Singleton {
 
   function createData(n) {
     const time = new Date();
+    const resolvedAppName = getAppName(n.appName || n.desktopEntry || "");
+    const resolvedAppId = getAppId(n.desktopEntry || n.appName || "");
     const id = Checksum.sha256(JSON.stringify({
                                                 "summary": n.summary,
                                                 "body": n.body,
@@ -428,7 +431,8 @@ Singleton {
       "id": id,
       "summary": n.summary || "",
       "body": stripTags(n.body || ""),
-      "appName": getAppName(n.appName || n.desktopEntry || ""),
+      "appName": resolvedAppName,
+      "appId": resolvedAppId,
       "urgency": n.urgency < 0 || n.urgency > 2 ? 1 : n.urgency,
       "expireTimeout": n.expireTimeout,
       "timestamp": time,
@@ -441,8 +445,48 @@ Singleton {
       "actionsJson": JSON.stringify((n.actions || []).map(a => ({
                                                                   "text": (a.text || "").trim() || "Action",
                                                                   "identifier": a.identifier || ""
-                                                                })))
+                                                                }))),
+      "groupKey": getHistoryGroupKey({
+                                      "appId": resolvedAppId
+                                    }),
+      "groupCount": 1,
+      "groupedEntriesJson": JSON.stringify([createHistoryGroupEntry({
+                                                                      "id": id,
+                                                                      "summary": n.summary || "",
+                                                                      "body": stripTags(n.body || ""),
+                                                                      "urgency": n.urgency < 0 || n.urgency > 2 ? 1 : n.urgency,
+                                                                      "timestamp": time
+                                                                    })])
     };
+  }
+
+  function getHistoryGroupKey(data) {
+    return Checksum.sha256(JSON.stringify({
+                                            "appId": data.appId || getAppId(data.appName || "") || "unknown"
+                                          }));
+  }
+
+  function createHistoryGroupEntry(data) {
+    var ts = data.timestamp;
+    if (ts instanceof Date)
+      ts = ts.getTime();
+    return {
+      "id": data.id || "",
+      "summary": data.summary || "",
+      "body": data.body || "",
+      "urgency": data.urgency < 0 || data.urgency > 2 ? 1 : data.urgency,
+      "timestamp": Number(ts) || Date.now()
+    };
+  }
+
+  function parseGroupedEntries(jsonValue, fallbackData) {
+    try {
+      var parsed = JSON.parse(jsonValue || "[]");
+      if (parsed && parsed.length > 0)
+        return parsed;
+    } catch (e) {
+    }
+    return [createHistoryGroupEntry(fallbackData)];
   }
 
   function findNotificationIndex(internalId) {
@@ -567,6 +611,50 @@ Singleton {
 
   // History management
   function addToHistory(data) {
+    if (!data.groupKey) {
+      data.groupKey = getHistoryGroupKey(data);
+    }
+    if (typeof data.groupCount !== "number" || data.groupCount < 1) {
+      data.groupCount = 1;
+    }
+    if (!data.groupedEntriesJson) {
+      data.groupedEntriesJson = JSON.stringify([createHistoryGroupEntry(data)]);
+    }
+
+    if (historyList.count > 0) {
+      const latest = historyList.get(0);
+      const latestGroupKey = latest.groupKey || getHistoryGroupKey(latest);
+      const latestTs = latest.timestamp instanceof Date ? latest.timestamp.getTime() : Number(latest.timestamp) || 0;
+      const incomingTs = data.timestamp instanceof Date ? data.timestamp.getTime() : Number(data.timestamp) || Date.now();
+      const withinWindow = Math.abs(incomingTs - latestTs) <= historyGroupingWindowMs;
+      if (latestGroupKey === data.groupKey && withinWindow) {
+        if (!latest.groupKey)
+          historyList.setProperty(0, "groupKey", latestGroupKey);
+        var latestEntries = parseGroupedEntries(latest.groupedEntriesJson, latest);
+        latestEntries.unshift(createHistoryGroupEntry(data));
+        historyList.setProperty(0, "groupedEntriesJson", JSON.stringify(latestEntries));
+        historyList.setProperty(0, "groupCount", latestEntries.length);
+        historyList.setProperty(0, "timestamp", data.timestamp);
+        historyList.setProperty(0, "urgency", Math.max(latest.urgency || 0, data.urgency || 0));
+        if (data.summary)
+          historyList.setProperty(0, "summary", data.summary);
+        if (data.body)
+          historyList.setProperty(0, "body", data.body);
+        if (data.appName)
+          historyList.setProperty(0, "appName", data.appName);
+        if (data.appId)
+          historyList.setProperty(0, "appId", data.appId);
+        if (data.cachedImage)
+          historyList.setProperty(0, "cachedImage", data.cachedImage);
+        if (data.originalImage)
+          historyList.setProperty(0, "originalImage", data.originalImage);
+        if (data.actionsJson && data.actionsJson !== "[]")
+          historyList.setProperty(0, "actionsJson", data.actionsJson);
+        saveHistory();
+        return;
+      }
+    }
+
     historyList.insert(0, data);
 
     while (historyList.count > maxHistory) {
@@ -615,6 +703,10 @@ Singleton {
         const n = historyList.get(i);
         const copy = Object.assign({}, n);
         copy.timestamp = n.timestamp.getTime();
+        copy.groupCount = (typeof n.groupCount === "number" && n.groupCount > 0) ? n.groupCount : 1;
+        copy.groupKey = n.groupKey || getHistoryGroupKey(n);
+        copy.appId = n.appId || getAppId(n.appName || "");
+        copy.groupedEntriesJson = n.groupedEntriesJson || JSON.stringify([createHistoryGroupEntry(n)]);
         items.push(copy);
       }
       adapter.notifications = items;
@@ -641,10 +733,21 @@ Singleton {
                              "summary": item.summary || "",
                              "body": item.body || "",
                              "appName": item.appName || "",
+                             "appId": item.appId || getAppId(item.appName || ""),
                              "urgency": item.urgency < 0 || item.urgency > 2 ? 1 : item.urgency,
                              "timestamp": time,
                              "originalImage": item.originalImage || "",
-                             "cachedImage": cachedImage
+                             "cachedImage": cachedImage,
+                             "actionsJson": item.actionsJson || "[]",
+                             "groupKey": item.groupKey || getHistoryGroupKey(item),
+                             "groupCount": (typeof item.groupCount === "number" && item.groupCount > 0) ? item.groupCount : 1,
+                             "groupedEntriesJson": item.groupedEntriesJson || JSON.stringify([createHistoryGroupEntry({
+                                                                                                                       "id": item.id,
+                                                                                                                       "summary": item.summary,
+                                                                                                                       "body": item.body,
+                                                                                                                       "urgency": item.urgency,
+                                                                                                                       "timestamp": time
+                                                                                                                     })])
                            });
       }
     } catch (e) {
@@ -727,6 +830,12 @@ Singleton {
     displayName = displayName.replace(/desktop$/i, '').trim();
 
     return displayName || name;
+  }
+
+  function getAppId(rawName) {
+    if (!rawName || String(rawName).trim() === "")
+      return "unknown";
+    return String(rawName).trim().toLowerCase();
   }
 
   function getIcon(icon) {
@@ -919,10 +1028,14 @@ Singleton {
                    "summary": entry.summary,
                    "body": entry.body,
                    "appName": entry.appName,
+                   "appId": entry.appId || getAppId(entry.appName || ""),
                    "urgency": entry.urgency,
                    "timestamp": entry.timestamp instanceof Date ? entry.timestamp.getTime() : entry.timestamp,
                    "originalImage": entry.originalImage,
-                   "cachedImage": entry.cachedImage
+                   "cachedImage": entry.cachedImage,
+                   "groupKey": entry.groupKey,
+                   "groupCount": entry.groupCount || 1,
+                   "groupedEntriesJson": entry.groupedEntriesJson || JSON.stringify([createHistoryGroupEntry(entry)])
                  });
     }
     return items;

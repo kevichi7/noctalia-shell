@@ -335,7 +335,23 @@ SmartPanel {
 
                     property string notificationId: model.id
                     property bool isExpanded: scrollView.expandedId === notificationId
-                    property bool canExpand: summaryText.truncated || bodyText.truncated
+                    property var groupEntriesList: {
+                      try {
+                        var parsed = JSON.parse(model.groupedEntriesJson || "[]");
+                        if (parsed && parsed.length > 0)
+                          return parsed;
+                      } catch (e) {
+                      }
+                      return [{
+                                "id": model.id,
+                                "summary": model.summary || "",
+                                "body": model.body || "",
+                                "urgency": model.urgency,
+                                "timestamp": model.timestamp instanceof Date ? model.timestamp.getTime() : model.timestamp
+                              }];
+                    }
+                    property bool hasGroupedEntries: (model.groupCount || groupEntriesList.length || 1) > 1
+                    property bool canExpand: hasGroupedEntries || summaryText.truncated || bodyText.truncated
                     property real swipeOffset: 0
                     property real pressGlobalX: 0
                     property real pressGlobalY: 0
@@ -571,6 +587,26 @@ SmartPanel {
                               color: Color.mSecondary
                             }
 
+                            Rectangle {
+                              visible: notificationDelegate.hasGroupedEntries
+                              radius: Style.radiusS
+                              color: Qt.alpha(Color.mPrimary, 0.16)
+                              border.color: Qt.alpha(Color.mPrimary, 0.45)
+                              border.width: 1
+                              height: Math.round(16 * Style.uiScaleRatio)
+                              implicitWidth: countLabel.implicitWidth + Style.marginS
+                              anchors.verticalCenter: parent.verticalCenter
+
+                              NText {
+                                id: countLabel
+                                anchors.centerIn: parent
+                                text: "x" + (model.groupCount || groupEntriesList.length || 1)
+                                pointSize: Style.fontSizeXXS
+                                font.weight: Style.fontWeightBold
+                                color: Color.mPrimary
+                              }
+                            }
+
                             NText {
                               textFormat: Text.PlainText
                               text: " " + Time.formatRelativeTime(model.timestamp)
@@ -605,6 +641,63 @@ SmartPanel {
                             maximumLineCount: notificationDelegate.isExpanded ? 999 : 3
                             elide: Text.ElideRight
                             visible: text.length > 0
+                          }
+
+                          Column {
+                            width: parent.width
+                            spacing: Style.marginXS
+                            visible: notificationDelegate.hasGroupedEntries && notificationDelegate.isExpanded
+
+                            Repeater {
+                              model: notificationDelegate.groupEntriesList
+
+                              delegate: Rectangle {
+                                width: parent ? parent.width : 0
+                                radius: Style.radiusS
+                                color: Qt.alpha(Color.mSurface, 0.55)
+                                border.color: Qt.alpha(Color.mOutline, 0.35)
+                                border.width: Style.borderS
+                                height: groupedEntryColumn.implicitHeight + Style.marginS
+
+                                Column {
+                                  id: groupedEntryColumn
+                                  anchors.fill: parent
+                                  anchors.margins: Style.marginXS
+                                  spacing: 2
+
+                                  Row {
+                                    width: parent.width
+                                    spacing: Style.marginXS
+
+                                    NText {
+                                      text: modelData.summary || I18n.tr("common.no-summary")
+                                      pointSize: Style.fontSizeXS
+                                      font.weight: Style.fontWeightSemiBold
+                                      color: Color.mOnSurface
+                                      elide: Text.ElideRight
+                                      width: parent.width - groupTimeLabel.implicitWidth - Style.marginXS
+                                    }
+
+                                    NText {
+                                      id: groupTimeLabel
+                                      text: Time.formatRelativeTime(modelData.timestamp)
+                                      pointSize: Style.fontSizeXXS
+                                      color: Color.mOnSurfaceVariant
+                                    }
+                                  }
+
+                                  NText {
+                                    visible: (modelData.body || "").length > 0
+                                    text: modelData.body || ""
+                                    pointSize: Style.fontSizeXXS
+                                    color: Color.mOnSurfaceVariant
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                  }
+                                }
+                              }
+                            }
                           }
 
                           // Expand indicator
