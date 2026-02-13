@@ -1180,7 +1180,7 @@ SmartPanel {
       NBox {
         anchors.centerIn: parent
         width: Math.min(parent.width - Style.marginXL * 2, Math.round(420 * Style.uiScaleRatio))
-        height: keybindHelpColumn.implicitHeight + Style.marginXL * 2
+        height: Math.min(parent.height - Style.marginXL * 2, Math.round(360 * Style.uiScaleRatio))
 
         ColumnLayout {
           id: keybindHelpColumn
@@ -1195,16 +1195,21 @@ SmartPanel {
             color: Color.mOnSurface
           }
 
-          NText {
+          NScrollView {
+            id: keybindHelpScroll
             Layout.fillWidth: true
-            text: panelContent.keybindHelpText()
-            pointSize: Style.fontSizeS
-            color: Color.mOnSurfaceVariant
-            wrapMode: Text.WordWrap
-          }
-
-          Item {
             Layout.fillHeight: true
+            horizontalPolicy: ScrollBar.AlwaysOff
+            verticalPolicy: ScrollBar.AsNeeded
+            reserveScrollbarSpace: false
+
+            NText {
+              width: keybindHelpScroll.availableWidth
+              text: panelContent.keybindHelpText()
+              pointSize: Style.fontSizeS
+              color: Color.mOnSurfaceVariant
+              wrapMode: Text.WordWrap
+            }
           }
 
           NButton {
