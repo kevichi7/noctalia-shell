@@ -1119,7 +1119,7 @@ SmartPanel {
     Rectangle {
       anchors.fill: parent
       visible: panelContent.showKeybindHelp
-      color: Qt.alpha(Color.mScrim, 0.45)
+      color: Qt.alpha(Color.mSurface, 0.28)
       radius: Style.radiusL
       z: 20
 
