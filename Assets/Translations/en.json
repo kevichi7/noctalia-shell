@@ -601,7 +601,7 @@
       "normal-mode-keybinds-text": "- ?: toggle this help panel\n- Up/Down: select notification\n- Left/Right: switch range\n- Home/End: jump to first/last\n- Enter: invoke selected action (or expand)\n- Tab/Shift+Tab: cycle actions\n- 1-9: invoke action by number\n- Delete/Backspace: dismiss selected\n- Ctrl+Shift+Delete: clear all history\n- Esc: close panel",
       "normal-mode-keybinds-disabled-text": "Keyboard controls are disabled for notification history.\n\nEnable \"History keyboard controls\" in Notifications > History to use these shortcuts.",
       "vim-keybinds-title": "Vim mode (optional)",
-      "vim-keybinds-text": "- j/k: move selection down/up\n- h/l: switch range left/right\n- g/G: jump to first/last notification"
+      "vim-keybinds-text": "- j/k: move selection down/up\n- h/l: switch range left/right\n- g/G: jump to first/last notification\n- x: dismiss selected notification"
     },
     "range": {
       "earlier": "Earlier",

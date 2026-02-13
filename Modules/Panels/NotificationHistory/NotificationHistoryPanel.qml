@@ -516,6 +516,11 @@ SmartPanel {
                           event.accepted = true;
                           return;
                         }
+                        if (vimKeyLower === "x") {
+                          if (panelContent.dismissSelectedNotification())
+                            event.accepted = true;
+                          return;
+                        }
                       }
 
                       if (event.key === Qt.Key_Up) {
