@@ -1254,6 +1254,8 @@
       "history-critical-urgency-description": "Save critical priority notifications to history.",
       "history-critical-urgency-label": "Save critical urgency to history",
       "history-desc": "Control which notifications are saved to history based on their urgency level.",
+      "history-grouping-description": "Group notification history entries by application and allow expanding grouped items.",
+      "history-grouping-label": "Group history notifications",
       "history-low-urgency-description": "Save low priority notifications to history.",
       "history-low-urgency-label": "Save low urgency to history",
       "history-normal-urgency-description": "Save normal priority notifications to history.",

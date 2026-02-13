@@ -10,6 +10,14 @@ ColumnLayout {
   Layout.fillWidth: true
 
   NToggle {
+    label: I18n.tr("panels.notifications.history-grouping-label")
+    description: I18n.tr("panels.notifications.history-grouping-description")
+    checked: Settings.data.notifications?.historyGroupingEnabled !== false
+    onToggled: checked => Settings.data.notifications.historyGroupingEnabled = checked
+    defaultValue: Settings.getDefaultValue("notifications.historyGroupingEnabled")
+  }
+
+  NToggle {
     label: I18n.tr("panels.notifications.history-low-urgency-label")
     description: I18n.tr("panels.notifications.history-low-urgency-description")
     checked: Settings.data.notifications?.saveToHistory?.low !== false

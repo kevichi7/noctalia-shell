@@ -621,7 +621,9 @@ Singleton {
       data.groupedEntriesJson = JSON.stringify([createHistoryGroupEntry(data)]);
     }
 
-    if (historyList.count > 0) {
+    const groupingEnabled = Settings.data.notifications?.historyGroupingEnabled !== false;
+
+    if (groupingEnabled && historyList.count > 0) {
       const latest = historyList.get(0);
       const latestGroupKey = latest.groupKey || getHistoryGroupKey(latest);
       const latestTs = latest.timestamp instanceof Date ? latest.timestamp.getTime() : Number(latest.timestamp) || 0;

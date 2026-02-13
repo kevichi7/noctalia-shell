@@ -395,6 +395,7 @@
     "lowUrgencyDuration": 3,
     "normalUrgencyDuration": 8,
     "criticalUrgencyDuration": 15,
+    "historyGroupingEnabled": true,
     "saveToHistory": {
       "low": true,
       "normal": true,
