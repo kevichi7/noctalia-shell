@@ -243,6 +243,24 @@ Item {
     `, root, "bottomGradient");
   }
 
+  WheelHandler {
+    enabled: !root.contentOverflows
+    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+    onWheel: event => {
+               event.accepted = true;
+             }
+  }
+
+  WheelHandler {
+    enabled: root.wheelScrollMultiplier !== 1.0 && root.contentOverflows
+    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+    onWheel: event => {
+               const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 2;
+               root.applyWheelScroll(delta);
+               event.accepted = true;
+             }
+  }
+
   ListView {
     id: listView
     anchors.fill: parent
@@ -273,25 +291,24 @@ Item {
       }
     }
 
-    onContentHeightChanged: root._wheelTargetY = root.clampScrollY(root._wheelTargetY)
-    onHeightChanged: root._wheelTargetY = root.clampScrollY(root._wheelTargetY)
-
-    WheelHandler {
-      enabled: !root.contentOverflows
-      acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-      onWheel: event => {
-                 event.accepted = true;
-               }
+    onContentYChanged: {
+      if (!wheelScrollAnimation.running) {
+        root._wheelTargetY = contentY;
+      }
     }
 
-    WheelHandler {
-      enabled: root.wheelScrollMultiplier !== 1.0 && root.contentOverflows
-      acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-      onWheel: event => {
-                 const delta = event.pixelDelta.y !== 0 ? event.pixelDelta.y : event.angleDelta.y / 2;
-                 root.applyWheelScroll(delta);
-                 event.accepted = true;
-               }
+    onContentHeightChanged: {
+      if (wheelScrollAnimation.running) {
+        wheelScrollAnimation.stop();
+      }
+      root._wheelTargetY = contentY;
+    }
+
+    onHeightChanged: {
+      if (wheelScrollAnimation.running) {
+        wheelScrollAnimation.stop();
+      }
+      root._wheelTargetY = contentY;
     }
 
     ScrollBar.vertical: ScrollBar {
